@@ -33,24 +33,20 @@ async def on_ready():
     update_status.start()
 
 
-# 🔧 FIX: wait until bot is ready before loop starts
-@update_status.before_loop
-async def before_update():
-    await bot.wait_until_ready()
-
-
 @tasks.loop(seconds=30)
 async def update_status():
     global last_message
 
     print("Loop running...")  # DEBUG
 
-    try:
-        # 🔧 FIX: fetch channel properly (works on Railway)
-        channel = await bot.fetch_channel(CHANNEL_ID)
+    # fetch channel OUTSIDE try so it's always defined
+    channel = await bot.fetch_channel(CHANNEL_ID)
 
+    try:
         server = JavaServer.lookup(SERVER_IP)
-        status = server.status()
+
+        # 🔧 FIX: run blocking call properly
+        status = await bot.loop.run_in_executor(None, server.status)
 
         players = f"{status.players.online}/{status.players.max}"
         version = status.version.name
@@ -82,6 +78,12 @@ async def update_status():
         last_message = await channel.send(message_text)
     else:
         await last_message.edit(content=message_text)
+
+
+# ✅ FIX: placed AFTER update_status is defined
+@update_status.before_loop
+async def before_update():
+    await bot.wait_until_ready()
 
 
 @bot.command()
