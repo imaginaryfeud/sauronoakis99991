@@ -36,9 +36,13 @@ async def update_status():
         status = await bot.loop.run_in_executor(None, server.status)
 
         players = f"{status.players.online}/{status.players.max}"
+        version = status.version.name
 
+        activity_text = f"{players} | {version}"
+
+        # Discord limit is 128 chars
         await bot.change_presence(
-            activity=discord.Game(name=f"🟢 {players} players")
+            activity=discord.Game(name=activity_text[:128])
         )
 
     except Exception as e:
