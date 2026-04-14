@@ -1,2 +1,2 @@
 discord.py
-ping3
+mcstatus
