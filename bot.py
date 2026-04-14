@@ -14,7 +14,7 @@ TOKEN = os.getenv("TOKEN")
 SERVER_IP = os.getenv("SERVER_IP")
 CHANNEL_ID = os.getenv("CHANNEL_ID")
 
-# Validate variables early (fail fast if missing)
+# Validate variables early
 if not TOKEN:
     raise ValueError("TOKEN is not set in Railway variables")
 if not SERVER_IP:
@@ -24,7 +24,7 @@ if not CHANNEL_ID:
 
 CHANNEL_ID = int(CHANNEL_ID)
 
-last_message = None  # stores message to edit instead of spamming
+last_message = None
 
 
 @bot.event
@@ -33,13 +33,22 @@ async def on_ready():
     update_status.start()
 
 
+# 🔧 FIX: wait until bot is ready before loop starts
+@update_status.before_loop
+async def before_update():
+    await bot.wait_until_ready()
+
+
 @tasks.loop(seconds=30)
 async def update_status():
     global last_message
 
-    channel = bot.get_channel(CHANNEL_ID)
+    print("Loop running...")  # DEBUG
 
     try:
+        # 🔧 FIX: fetch channel properly (works on Railway)
+        channel = await bot.fetch_channel(CHANNEL_ID)
+
         server = JavaServer.lookup(SERVER_IP)
         status = server.status()
 
@@ -54,12 +63,14 @@ async def update_status():
             f"MOTD: {motd}"
         )
 
-        # Update bot presence (shows in member list)
+        # Update bot presence
         await bot.change_presence(
             activity=discord.Game(name=f"🟢 {players} players")
         )
 
-    except Exception:
+    except Exception as e:
+        print(f"Error: {e}")  # DEBUG
+
         message_text = "🔴 **Offline**"
 
         await bot.change_presence(
@@ -67,11 +78,10 @@ async def update_status():
         )
 
     # Send or update message
-    if channel:
-        if last_message is None:
-            last_message = await channel.send(message_text)
-        else:
-            await last_message.edit(content=message_text)
+    if last_message is None:
+        last_message = await channel.send(message_text)
+    else:
+        await last_message.edit(content=message_text)
 
 
 @bot.command()
